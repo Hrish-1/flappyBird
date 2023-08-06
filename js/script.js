@@ -13,7 +13,7 @@ const difficulty = ((str) => {
     case "HARD":
       return 2.5
   }
-})("HARD")
+})("MEDIUM")
 
 function image(path) {
   const img = new Image();
@@ -30,20 +30,30 @@ function imgPaths() {
   }
 }
 
-function initialStates() {
+class Bird {
+  constructor() {
+    this.x = 0
+    this.y = 120
+    this.yspeed = 0
+    this.yacc = 200
+    this.score = 0
+  }
+}
+
+class Pipe {
+  constructor(x, y, xspeed) {
+    this.x = x
+    this.y = y
+    this.xspeed = xspeed
+  }
+}
+
+function initalStates() {
   return {
     "bgImage": [{ x: 0, y: 0 }],
-    "bird": [{ x: 0, y: 120, yspeed: 0, yacc: 200, score: 0 }],
-    "upperPipes": [
-      { x: 25, y: -100, xspeed: -30 },
-      { x: 75, y: -50, xspeed: -30 },
-      { x: 130, y: -70, xspeed: -30 }
-    ],
-    "lowerPipes": [
-      { x: 25, y: 150, xspeed: -30 },
-      { x: 75, y: 150, xspeed: -30 },
-      { x: 130, y: 160, xspeed: -30 }
-    ],
+    "bird": [new Bird()],
+    "upperPipes": [new Pipe(25, -100, -30), new Pipe(75, -50, -30), new Pipe(130, -70, -30)],
+    "lowerPipes": [new Pipe(25, 150, -30), new Pipe(75, 150, -30), new Pipe(130, 160, -30)]
   }
 }
 
@@ -53,7 +63,7 @@ addEventListener('keydown', (event) => {
   }
   if (gameOver && event.key === 'Enter') {
     gameOver = false
-    loop(initialStates())
+    loop(initalStates())
   }
 })
 
@@ -86,44 +96,41 @@ function displayScore(score) {
 function loop(states) {
   if (gameOver) return
   render(states)
-  requestAnimationFrame(() => loop(newState(states)))
+  requestAnimationFrame(() => loop(newStates(states)))
 }
-loop(initialStates())
+loop(initalStates())
 
-function newState(prevState) {
-  let newState = {}
-  for (state in prevState) {
-    switch (state) {
-      case "bgImage":
-        newState["bgImage"] = [{ x: 0, y: 0 }]
-        break
-      case "bird":
-        newState["bird"] = prevState[state].map(s => ({
-          x: s.x,
-          y: s.y + s.yspeed * modifier,
-          yspeed: keyPresses.length ? -100 : s.yspeed + s.yacc * modifier,
-          yacc: s.yacc,
-          score: prevState['upperPipes'].some(pipe => pipe.x < -25) ? s.score + 1 : s.score
-        }))
-        break
-      case "upperPipes":
-        newState["upperPipes"] = prevState[state].map(s => newPipeState(s, 'upper'))
-        break
-      case "lowerPipes":
-        newState["lowerPipes"] = prevState[state].map(s => newPipeState(s, 'lower'))
-        break
+function newStates(prevState) {
+  prevState['bird'].forEach(bird => {
+    bird.y += bird.yspeed * modifier
+    bird.yspeed = keyPresses.length ? -100 : bird.yspeed + bird.yacc * modifier
+    bird.score = prevState['upperPipes'].some(pipe => pipe.x < -25) ? bird.score + 1 : bird.score
+  })
+  prevState['upperPipes'].forEach(pipe => {
+    if (pipe.x < -25) {
+      pipe.x = 144
+      pipe.y = -30 - Math.random() * 50
+    } else {
+      pipe.x += pipe.xspeed * modifier * difficulty
     }
-  }
-  destroy(prevState)
-  if (detectCollision(newState)) {
+  })
+  prevState['lowerPipes'].forEach(pipe => {
+    if (pipe.x < -25) {
+      pipe.x = 144
+      pipe.y = 200 - Math.random() * 50
+    } else {
+      pipe.x += pipe.xspeed * modifier * difficulty
+    }
+  })
+  if (detectCollision(prevState)) {
     gameOver = true
-    const { bird } = newState
+    const { bird } = prevState
     displayScore(bird[0].score)
     ctx.font = "12px Helvetica"
     ctx.fillText("press enter to continue", 10, 110)
-    return initialStates()
+    return initalStates()
   }
-  return newState
+  return prevState
 }
 
 function detectCollision(state) {
@@ -135,25 +142,4 @@ function detectCollision(state) {
     pipe.x < 15 && bird[0].y > pipe.y - 10
   )
   return upperPipeCollision || lowerPipeCollision
-}
-
-function destroy(obj) {
-  for (let prop in obj) {
-    delete obj[prop]
-  }
-  obj = null
-}
-
-function newPipeState(prevState, pipe) {
-  if (prevState.x < -25) {
-    return {
-      x: 144,
-      y: (pipe === 'upper' ? -30 : 200) - Math.random() * 50,
-      xspeed: prevState.xspeed
-    }
-  }
-  return {
-    x: prevState.x + prevState.xspeed * modifier * difficulty,
-    y: prevState.y, xspeed: prevState.xspeed
-  }
 }
